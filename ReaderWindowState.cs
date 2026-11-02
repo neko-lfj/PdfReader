@@ -25,9 +25,14 @@ namespace PdfReader
             _active = true;
         }
 
-        internal void Show()
+        internal void Show(bool fullscreen = true)
         {
-            if (_active) _setFullscreen(true);
+            if (_active) _setFullscreen(fullscreen);
+        }
+
+        internal void ToggleFullscreen()
+        {
+            if (_active) _setFullscreen(!_getFullscreen());
         }
 
         internal void End(bool selectMouse)

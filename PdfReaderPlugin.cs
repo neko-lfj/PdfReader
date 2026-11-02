@@ -373,6 +373,9 @@ namespace PdfReader
             await OpenDocumentAsync(dialog.FileName, 0).ConfigureAwait(false);
         }
 
+        internal bool IsReaderFullscreen => _windowService?.IsFullscreen == true;
+        internal void ToggleReaderFullscreen() => _readerWindowState?.ToggleFullscreen();
+
         internal async Task OpenDocumentAsync(string path, int initialPage)
         {
             if (!EnsureUsable()) return;
@@ -405,7 +408,7 @@ namespace PdfReader
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     if (ReferenceEquals(_readerWindowState, windowState) && session.IsOpen)
-                        windowState.Show();
+                        windowState.Show(_config.DefaultFullscreen);
                 });
 
                 // 打开 PDF 后自动开启双指缩放/移动：把当前的笔模式同步给会话（单指平移门控用）。

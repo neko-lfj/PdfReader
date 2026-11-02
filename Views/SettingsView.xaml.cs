@@ -31,6 +31,7 @@ namespace PdfReader.Views
 
             RenderScaleLabel.Text = Strings.SettingsRenderScale;
             RememberLabel.Text = Strings.SettingsRememberLast;
+            FullscreenLabel.Text = Strings.DefaultFullscreen;
             CacheBudgetLabel.Text = Strings.SettingsCacheBudget;
 
             AssocHeader.Text = Strings.AssocSectionHeader;
@@ -51,6 +52,7 @@ namespace PdfReader.Views
                 RenderScaleSlider.Value = _config.NormalizedRenderScale;
                 RenderScaleValue.Text = FormatScale(_config.NormalizedRenderScale);
                 RememberToggle.IsOn = _config.RememberLastDocument;
+                FullscreenToggle.IsOn = _config.DefaultFullscreen;
                 CacheBudgetSlider.Value = _config.NormalizedCacheBudgetMb;
                 CacheBudgetValue.Text = _config.NormalizedCacheBudgetMb.ToString(CultureInfo.CurrentCulture);
             }
@@ -70,6 +72,13 @@ namespace PdfReader.Views
             if (_loading || _config == null) return;
 
             _config.RenderScale = e.NewValue;
+            _plugin?.SaveConfig();
+        }
+
+        private void FullscreenToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _config == null) return;
+            _config.DefaultFullscreen = FullscreenToggle.IsOn;
             _plugin?.SaveConfig();
         }
 

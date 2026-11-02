@@ -22,6 +22,9 @@ namespace PdfReader
         // 命令
         public static string Open => IsEnglish ? "Open" : "打开";
         public static string Close => IsEnglish ? "Close PDF" : "关闭 PDF";
+        public static string ExitFullscreen => IsEnglish ? "Exit fullscreen" : "退出全屏";
+        public static string EnterFullscreen => IsEnglish ? "Enter fullscreen" : "进入全屏";
+        public static string DefaultFullscreen => IsEnglish ? "Open PDFs in fullscreen by default" : "打开 PDF 默认全屏";
         public static string PrevPage => IsEnglish ? "Previous page" : "上一页";
         public static string NextPage => IsEnglish ? "Next page" : "下一页";
         public static string Export => IsEnglish ? "Export with ink" : "导出（含墨迹）";

@@ -11,6 +11,8 @@ namespace PdfReader
     /// </summary>
     internal sealed class ReaderConfig
     {
+        [JsonPropertyName("defaultFullscreen")]
+        public bool DefaultFullscreen { get; set; } = true;
         [JsonPropertyName("displayMode")]
         public PdfDisplayMode DisplayMode { get; set; } = PdfDisplayMode.ContinuousScroll;
         /// <summary>

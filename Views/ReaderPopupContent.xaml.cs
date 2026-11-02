@@ -32,6 +32,12 @@ namespace PdfReader.Views
             RefreshState();
         }
 
+        private void FullscreenButton_Click(object sender, RoutedEventArgs e)
+        {
+            _plugin?.ToggleReaderFullscreen();
+            RefreshState();
+        }
+
         private void ApplyLocalizedText()
         {
             OpenButton.Content = Strings.Open;
@@ -69,6 +75,8 @@ namespace PdfReader.Views
             NextButton.IsEnabled = open && page < total - 1;
             ExportButton.IsEnabled = open;
             CloseButton.IsEnabled = open;
+            FullscreenButton.IsEnabled = open;
+            FullscreenButton.Content = _plugin?.IsReaderFullscreen == true ? Strings.ExitFullscreen : Strings.EnterFullscreen;
             DisplayModeCombo.IsEnabled = open;
 
             // 同步模式选择，抑制事件循环。

@@ -39,7 +39,7 @@ internal static class Program
         string root = Path.Combine(Path.GetTempPath(), "PdfReaderContinuous_" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
         try
         {
-            WindowStateTests(); WheelStepTests(); RenderBudgetTests(); ViewportPlanTests(); NativeResolutionTests(root); RegionRenderTests(root); ConfigTests(root); LayoutTests(); SessionTests(root);
+            WindowStateTests(); WheelStepTests(); RenderBudgetTests(); ViewportPlanTests(); NativeResolutionTests(root); RegionRenderTests(root); ConfigTests(root); LayoutTests(); SessionTests(root); FullscreenUiTests();
             Console.WriteLine($"PASS: {_checks} continuous PDF checks"); return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -70,6 +70,37 @@ internal static class Program
         try { failingRestore.End(true); } catch (InvalidOperationException) { }
         Check(mouseCount == 2, "Window restore failure prevented leaving annotation mode");
         Check(changes.SequenceEqual(new[] { true, true, false, false }), "Unexpected fullscreen lifecycle");
+        bool windowFullscreen = true;
+        var windowed = new ReaderWindowState(() => windowFullscreen, value => windowFullscreen = value, () => { });
+        windowed.ToggleFullscreen(); Check(windowFullscreen, "An inactive reader toggled the host window");
+        windowed.Begin(); windowed.Show(false); Check(!windowFullscreen, "Default windowed opening entered fullscreen");
+        windowed.ToggleFullscreen(); Check(windowFullscreen, "Reader could not re-enter fullscreen");
+        windowed.ToggleFullscreen(); Check(!windowFullscreen, "Reader could not exit fullscreen");
+        windowed.End(false); Check(windowFullscreen, "Closing did not restore the original fullscreen state");
+        string settings = Path.Combine(Path.GetTempPath(), "PdfFullscreen-" + Guid.NewGuid() + ".json");
+        try
+        {
+            var config = new ReaderConfig(); Check(config.DefaultFullscreen, "Existing configs lost default fullscreen");
+            config.DefaultFullscreen = false; config.Save(settings);
+            Check(!ReaderConfig.Load(settings).DefaultFullscreen, "Fullscreen preference did not survive a restart");
+        }
+        finally { File.Delete(settings); }
+    }
+
+    // Loading modern theme resources changes process-wide WPF defaults. Keep
+    // themed control checks after the isolated unthemed document fixtures.
+    private static void FullscreenUiTests()
+    {
+        var settingsView = new PdfReader.Views.SettingsView(null);
+        var toggle = (iNKORE.UI.WPF.Modern.Controls.ToggleSwitch)settingsView.FindName("FullscreenToggle");
+        Check(toggle.IsOn, "Settings did not initialize fullscreen default");
+        toggle.IsOn = false;
+        var settingsConfig = (ReaderConfig)typeof(PdfReader.Views.SettingsView).GetField("_config",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(settingsView);
+        Check(!settingsConfig.DefaultFullscreen, "Settings toggle did not update the configuration");
+        var popup = new PdfReader.Views.ReaderPopupContent(null);
+        var button = (System.Windows.Controls.Button)popup.FindName("FullscreenButton");
+        Check(!button.IsEnabled && !string.IsNullOrEmpty(button.Content as string), "Fullscreen command had no label or was enabled without a document");
     }
 
     private static void RenderBudgetTests()

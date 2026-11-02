@@ -44,6 +44,8 @@
                     <Button x:Name="ExportButton" Padding="10,4" MinWidth="104" Click="ExportButton_Click" />
                     <Button x:Name="CloseButton" Padding="10,4" MinWidth="88" Click="CloseButton_Click" />
                 </ikw:SimpleStackPanel>
+                <Button x:Name="FullscreenButton" Padding="10,4" MinWidth="88"
+                        HorizontalAlignment="Stretch" Click="FullscreenButton_Click" />
             </ikw:SimpleStackPanel>
         </ContentControl>
     </Grid>

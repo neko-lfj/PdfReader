@@ -40,6 +40,11 @@
                         </StackPanel>
                     </DockPanel>
                     <DockPanel>
+                        <TextBlock x:Name="FullscreenLabel" VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch x:Name="FullscreenToggle" HorizontalAlignment="Right"
+                                         DockPanel.Dock="Right" Toggled="FullscreenToggle_Toggled"/>
+                    </DockPanel>
+                    <DockPanel>
                         <TextBlock x:Name="RememberLabel" VerticalAlignment="Center"/>
                         <ui:ToggleSwitch x:Name="RememberToggle" HorizontalAlignment="Right"
                                          DockPanel.Dock="Right" Toggled="RememberToggle_Toggled"/>
