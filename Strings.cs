@@ -24,9 +24,7 @@ namespace PdfReader
         public static string Close => IsEnglish ? "Close PDF" : "关闭 PDF";
         public static string ExitFullscreen => IsEnglish ? "Exit fullscreen" : "退出全屏";
         public static string MinimizeWindow => IsEnglish ? "Minimize" : "最小化";
-        public static string NativeCaptionRequiresRestart => IsEnglish
-            ? "Native title bars require WindowChrome rendering. Enable it in the host window settings and restart ICCCE."
-            : "原生标题栏需要 WindowChrome 渲染。请在宿主窗口设置中启用该选项并重启 ICCCE。";
+        public static string MaximizeRestoreWindow => IsEnglish ? "Maximize / Restore" : "最大化／还原";
         public static string EnterFullscreen => IsEnglish ? "Enter fullscreen" : "进入全屏";
         public static string DefaultFullscreen => IsEnglish ? "Open PDFs in fullscreen by default" : "打开 PDF 默认全屏";
         public static string PrevPage => IsEnglish ? "Previous page" : "上一页";

@@ -39,7 +39,7 @@ internal static class Program
         string root = Path.Combine(Path.GetTempPath(), "PdfReaderContinuous_" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
         try
         {
-            WindowStateTests(); WheelStepTests(); RenderBudgetTests(); ViewportPlanTests(); NativeResolutionTests(root); RegionRenderTests(root); ConfigTests(root); LayoutTests(); SessionTests(root); FullscreenUiTests();
+            WindowStateTests(); WheelStepTests(); RenderBudgetTests(); ViewportPlanTests(); NativeResolutionTests(root); RegionRenderTests(root); ConfigTests(root); LayoutTests(); SessionTests(root); FullscreenUiTests(); TransparentWindowControlsTests();
             Console.WriteLine($"PASS: {_checks} continuous PDF checks"); return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -151,6 +151,48 @@ internal static class Program
             state.Begin(); state.Show(false); window.UpdateLayout();
             Check(window.ActualWidth < width, "Default windowed mode still covered the screen");
             state.End(false);
+        }
+        finally { window.Close(); }
+    }
+
+    private static void TransparentWindowControlsTests()
+    {
+        var window = new Window { Width = 600, Height = 400, AllowsTransparency = true,
+            WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Opacity = 0 };
+        var root = new Grid(); window.Content = root;
+        bool closed = false;
+        var placement = new ReaderWindowPlacement(window, () => closed = true);
+        try
+        {
+            window.Show(); placement.Capture(); placement.ShowWindowed(); window.UpdateLayout();
+            Check(root.Children.Count == 1 && root.Children[0] is StackPanel,
+                "Transparent host has no window controls");
+            var controls = (StackPanel)root.Children[0];
+            Check(controls.Children.Count == 3, "Transparent host lost minimize/maximize/close");
+            void Click(int index) => ((Button)controls.Children[index]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Click(1); Pump(80);
+            Check(window.WindowState == WindowState.Maximized && window.WindowStyle == WindowStyle.None,
+                "Transparent host maximize failed");
+            Click(1); Pump(80);
+            Check(window.WindowState == WindowState.Normal, "Transparent host restore failed");
+            Click(0); Pump(80);
+            Check(window.WindowState == WindowState.Minimized, "Transparent host minimize failed");
+            window.WindowState = WindowState.Normal;
+            Click(2); Check(closed && window.IsVisible, "Transparent close did not close only the PDF session");
+            placement.ShowWindowed();
+            Check(root.Children.Count == 1, "Repeated windowed updates duplicated controls");
+            foreach (string language in new[] { "en-US", "zh-CN" })
+            {
+                var previous = System.Globalization.CultureInfo.CurrentUICulture;
+                try {
+                    System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo(language);
+                    Check(!string.IsNullOrEmpty(Strings.MaximizeRestoreWindow), "Window operation label missing");
+                } finally { System.Globalization.CultureInfo.CurrentUICulture = previous; }
+            }
+            placement.HideWindowedControls();
+            Check(root.Children.Count == 0, "Fullscreen retained fallback controls");
+            placement.ShowWindowed(); placement.Restore();
+            Check(root.Children.Count == 0 && window.AllowsTransparency, "Close altered the safe compositor or retained controls");
         }
         finally { window.Close(); }
     }

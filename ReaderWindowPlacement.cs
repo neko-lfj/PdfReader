@@ -2,6 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Controls;
+using System.Windows.Media;
 
 
 
@@ -15,6 +17,8 @@ namespace PdfReader
         private bool _captured, _changed;
         private readonly Action _close;
         private bool _nativeCaption;
+        private Panel _controlsParent;
+        private StackPanel _fallbackControls;
         private WindowStyle _style;
         private ResizeMode _resize;
         private System.Windows.Shell.WindowChrome _chrome;
@@ -56,10 +60,10 @@ namespace PdfReader
         }
         private void ShowControls()
         {
-            if (_nativeCaption) return;
+            if (_nativeCaption || _fallbackControls != null) return;
             if (_window.AllowsTransparency)
             {
-                System.Windows.MessageBox.Show(_window, Strings.NativeCaptionRequiresRestart, Strings.PluginName);
+                ShowTransparentWindowControls();
                 return;
             }
             _nativeCaption = true;
@@ -67,6 +71,33 @@ namespace PdfReader
             _window.ResizeMode = ResizeMode.CanResize;
             _window.WindowStyle = WindowStyle.SingleBorderWindow;
             _window.Closing += WindowClosing;
+        }
+        // A WPF per-pixel window cannot have a native caption. Never ask the
+        // user to enable a compositor that can block all other applications.
+        // Keep window operations available on existing transparent hosts.
+        private void ShowTransparentWindowControls()
+        {
+            if (!(_window.Content is Panel parent)) return;
+            _controlsParent = parent;
+            _fallbackControls = new StackPanel {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(8), Background = Brushes.DimGray };
+            void Add(string symbol, string label, Action action)
+            {
+                var button = new Button { Content = symbol, ToolTip = label,
+                    Width = 42, Height = 32, Foreground = Brushes.White, Background = Brushes.Transparent };
+                System.Windows.Automation.AutomationProperties.SetName(button, label);
+                button.Click += (_, __) => action();
+                _fallbackControls.Children.Add(button);
+            }
+            Add("−", Strings.MinimizeWindow, () => _window.WindowState = WindowState.Minimized);
+            Add("□", Strings.MaximizeRestoreWindow, () => _window.WindowState =
+                _window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized);
+            Add("×", Strings.Close, () => _close?.Invoke());
+            Panel.SetZIndex(_fallbackControls, int.MaxValue);
+            parent.Children.Add(_fallbackControls);
         }
         private void WindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
@@ -89,6 +120,9 @@ namespace PdfReader
         {
             _windowed = false;
             if (_window != null) _window.LayoutUpdated -= KeepToolbarVisible;
+            if (_fallbackControls != null) _controlsParent?.Children.Remove(_fallbackControls);
+            _fallbackControls = null;
+            _controlsParent = null;
             RestoreCaption();
             if (_toolbar != null) _toolbar.SetCurrentValue(FrameworkElement.MarginProperty, _toolbarMargin);
         }
