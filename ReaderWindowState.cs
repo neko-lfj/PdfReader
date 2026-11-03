@@ -34,6 +34,7 @@ namespace PdfReader
             if (!_active) return;
             _setFullscreen(fullscreen);
             if (!fullscreen) _placement?.ShowWindowed();
+            else _placement?.HideWindowedControls();
         }
 
         internal void ToggleFullscreen()

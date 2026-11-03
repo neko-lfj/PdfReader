@@ -106,18 +106,44 @@ internal static class Program
             WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Opacity = 0 };
         try
         {
+            var root = new System.Windows.Controls.Grid(); window.Content = root;
+            var toolbar = new System.Windows.Controls.Border { Width = 300, Height = 50,
+                HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(window.Width - 100, window.Height - 20, -1000, -1000) };
+            NameScope.SetNameScope(window, new NameScope()); window.RegisterName("ViewboxFloatingBar", toolbar);
+            root.Children.Add(toolbar); var originalMargin = toolbar.Margin;
             window.Show(); window.UpdateLayout();
             double width = window.Width, height = window.Height;
             bool fullscreen = false;
             // Reproduce a host that only changes its flag and restores an
             // already screen-sized borderless placement.
-            var state = new ReaderWindowState(() => fullscreen, value => fullscreen = value, () => window.Width = 100, new ReaderWindowPlacement(window));
+            bool closed = false;
+            ReaderWindowState state = null;
+            state = new ReaderWindowState(() => fullscreen, value => fullscreen = value, () => window.Width = 100,
+                new ReaderWindowPlacement(window, () => closed = true, () => state.Show(true)));
             state.Begin(); state.Show(); state.ToggleFullscreen(); window.UpdateLayout();
             Check(!fullscreen && window.ActualWidth < width && window.ActualHeight < height,
                 "Exit fullscreen changed only the flag, not the native window size");
+            window.UpdateLayout();
+            Check(toolbar.Margin.Left + toolbar.ActualWidth <= root.ActualWidth
+                && toolbar.Margin.Top + toolbar.ActualHeight <= root.ActualHeight,
+                "The existing annotation toolbar was clipped outside the window");
+            var controls = root.Children.OfType<System.Windows.Controls.StackPanel>().Single();
+            Check(controls.Children.Count == 3, "Windowed reading did not provide three window controls");
+            ((System.Windows.Controls.Button)controls.Children[0]).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            Check(window.WindowState == WindowState.Minimized, "Minimize window control failed");
+            window.WindowState = WindowState.Normal;
+            ((System.Windows.Controls.Button)controls.Children[1]).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            Check(fullscreen && !root.Children.Contains(controls) && toolbar.Margin == originalMargin,
+                "Maximize did not return to fullscreen or restore toolbar placement");
+            state.Show(false); window.UpdateLayout();
+            controls = root.Children.OfType<System.Windows.Controls.StackPanel>().Single();
+            ((System.Windows.Controls.Button)controls.Children[2]).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            Check(closed, "Windowed PDF close command failed");
             state.End(true); window.UpdateLayout();
             Check(Math.Abs(window.Width - width) < 1 && Math.Abs(window.Height - height) < 1,
                 "Closing PDF lost the original desktop window size");
+            Check(root.Children.Count == 1 && toolbar.Margin == originalMargin, "Closing PDF retained temporary controls or toolbar placement");
             state.Begin(); state.Show(false); window.UpdateLayout();
             Check(window.ActualWidth < width, "Default windowed mode still covered the screen");
             state.End(false);

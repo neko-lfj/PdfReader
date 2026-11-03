@@ -7,7 +7,7 @@
     <Nullable>disable</Nullable>
     <RootNamespace>PdfReader</RootNamespace>
     <AssemblyName>PdfReader</AssemblyName>
-    <Version>2.3.8</Version>
+    <Version>2.3.9</Version>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>

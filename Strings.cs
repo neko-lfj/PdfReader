@@ -23,6 +23,7 @@ namespace PdfReader
         public static string Open => IsEnglish ? "Open" : "打开";
         public static string Close => IsEnglish ? "Close PDF" : "关闭 PDF";
         public static string ExitFullscreen => IsEnglish ? "Exit fullscreen" : "退出全屏";
+        public static string MinimizeWindow => IsEnglish ? "Minimize" : "最小化";
         public static string EnterFullscreen => IsEnglish ? "Enter fullscreen" : "进入全屏";
         public static string DefaultFullscreen => IsEnglish ? "Open PDFs in fullscreen by default" : "打开 PDF 默认全屏";
         public static string PrevPage => IsEnglish ? "Previous page" : "上一页";
