@@ -2,8 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Controls;
-using System.Windows.Media;
+
+
 
 namespace PdfReader
 {
@@ -13,18 +13,23 @@ namespace PdfReader
         private Rect _bounds;
         private WindowState _state;
         private bool _captured, _changed;
-        private readonly Action _close, _maximize;
-        private Panel _parent;
-        private StackPanel _controls;
+        private readonly Action _close;
+        private bool _nativeCaption;
+        private WindowStyle _style;
+        private ResizeMode _resize;
+        private System.Windows.Shell.WindowChrome _chrome;
+
         private FrameworkElement _toolbar;
         private Thickness _toolbarMargin;
         private bool _windowed;
-        internal ReaderWindowPlacement(Window window, Action close = null, Action maximize = null)
-        { _window = window; _close = close; _maximize = maximize; }
+        internal ReaderWindowPlacement(Window window, Action close = null)
+        { _window = window; _close = close; }
         internal void Capture()
         {
             if (_window == null || _captured) return;
             _state = _window.WindowState;
+            _style = _window.WindowStyle; _resize = _window.ResizeMode;
+            _chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(_window);
             _bounds = _state == WindowState.Normal ? new Rect(_window.Left, _window.Top, _window.ActualWidth, _window.ActualHeight) : _window.RestoreBounds;
             _captured = true;
             _toolbar = _window.FindName("ViewboxFloatingBar") as FrameworkElement;
@@ -51,28 +56,30 @@ namespace PdfReader
         }
         private void ShowControls()
         {
-            if (_controls != null || !(_window.Content is Panel parent)) return;
-            _parent = parent;
-            _controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(8), Background = Brushes.DimGray };
-            void Add(string symbol, string label, Action action)
+            if (_nativeCaption) return;
+            if (_window.AllowsTransparency)
             {
-                var button = new Button { Content = symbol, ToolTip = label, Width = 42, Height = 32,
-                    Foreground = Brushes.White, Background = Brushes.Transparent };
-                System.Windows.Automation.AutomationProperties.SetName(button, label);
-                button.Click += (_, __) => action(); _controls.Children.Add(button);
+                System.Windows.MessageBox.Show(_window, Strings.NativeCaptionRequiresRestart, Strings.PluginName);
+                return;
             }
-            Add("−", Strings.MinimizeWindow, () => _window.WindowState = WindowState.Minimized);
-            Add("□", Strings.EnterFullscreen, () => _maximize?.Invoke());
-            Add("×", Strings.Close, () => _close?.Invoke());
-            Panel.SetZIndex(_controls, int.MaxValue); parent.Children.Add(_controls);
+            _nativeCaption = true;
+            System.Windows.Shell.WindowChrome.SetWindowChrome(_window, null);
+            _window.ResizeMode = ResizeMode.CanResize;
+            _window.WindowStyle = WindowStyle.SingleBorderWindow;
+            _window.Closing += WindowClosing;
+        }
+        private void WindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (!_windowed || _close == null) return;
+            e.Cancel = true;
+            _close();
         }
         private void KeepToolbarVisible(object sender, EventArgs e)
         {
             if (!_windowed || _toolbar == null || _toolbar.Visibility != Visibility.Visible
                 || !(_toolbar.Parent is FrameworkElement parent) || parent.ActualWidth <= 0 || parent.ActualHeight <= 0) return;
             var margin = _toolbar.Margin;
-            double x = Math.Max(0, Math.Min(margin.Left, Math.Max(0, parent.ActualWidth - _toolbar.ActualWidth - 8)));
+            double x = Math.Max(0, (parent.ActualWidth - _toolbar.ActualWidth) / 2);
             double y = Math.Max(0, Math.Min(margin.Top, Math.Max(0, parent.ActualHeight - _toolbar.ActualHeight - 8)));
             if (Math.Abs(x - margin.Left) < .1 && Math.Abs(y - margin.Top) < .1) return;
             _toolbar.BeginAnimation(FrameworkElement.MarginProperty, null);
@@ -82,9 +89,16 @@ namespace PdfReader
         {
             _windowed = false;
             if (_window != null) _window.LayoutUpdated -= KeepToolbarVisible;
-            if (_controls != null) _parent?.Children.Remove(_controls);
-            _controls = null; _parent = null;
+            RestoreCaption();
             if (_toolbar != null) _toolbar.SetCurrentValue(FrameworkElement.MarginProperty, _toolbarMargin);
+        }
+        private void RestoreCaption()
+        {
+            if (!_nativeCaption) return;
+            _window.Closing -= WindowClosing;
+            _window.WindowStyle = _style; _window.ResizeMode = _resize;
+            System.Windows.Shell.WindowChrome.SetWindowChrome(_window, _chrome);
+            _nativeCaption = false;
         }
         private void Apply(Rect bounds)
         {
@@ -105,3 +119,5 @@ namespace PdfReader
         [DllImport("user32.dll", CharSet = CharSet.Auto)] private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
     }
 }
+
+

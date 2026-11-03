@@ -120,7 +120,7 @@ internal static class Program
             bool closed = false;
             ReaderWindowState state = null;
             state = new ReaderWindowState(() => fullscreen, value => fullscreen = value, () => window.Width = 100,
-                new ReaderWindowPlacement(window, () => closed = true, () => state.Show(true)));
+                new ReaderWindowPlacement(window, () => closed = true));
             state.Begin(); state.Show(); state.ToggleFullscreen(); window.UpdateLayout();
             Check(!fullscreen && window.ActualWidth < width && window.ActualHeight < height,
                 "Exit fullscreen changed only the flag, not the native window size");
@@ -128,22 +128,26 @@ internal static class Program
             Check(toolbar.Margin.Left + toolbar.ActualWidth <= root.ActualWidth
                 && toolbar.Margin.Top + toolbar.ActualHeight <= root.ActualHeight,
                 "The existing annotation toolbar was clipped outside the window");
-            var controls = root.Children.OfType<System.Windows.Controls.StackPanel>().Single();
-            Check(controls.Children.Count == 3, "Windowed reading did not provide three window controls");
-            ((System.Windows.Controls.Button)controls.Children[0]).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-            Check(window.WindowState == WindowState.Minimized, "Minimize window control failed");
+            Check(window.WindowStyle == WindowStyle.SingleBorderWindow && window.ResizeMode == ResizeMode.CanResize,
+                "Windowed reading did not use the system caption and resizing");
+            Check(Math.Abs(toolbar.Margin.Left - (root.ActualWidth - toolbar.ActualWidth) / 2) < 1,
+                "The annotation toolbar was not centered in the window");
+            SystemCommands.MinimizeWindow(window); Pump(80);
+            Check(window.WindowState == WindowState.Minimized, "Native minimize failed");
             window.WindowState = WindowState.Normal;
-            ((System.Windows.Controls.Button)controls.Children[1]).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-            Check(fullscreen && !root.Children.Contains(controls) && toolbar.Margin == originalMargin,
-                "Maximize did not return to fullscreen or restore toolbar placement");
-            state.Show(false); window.UpdateLayout();
-            controls = root.Children.OfType<System.Windows.Controls.StackPanel>().Single();
-            ((System.Windows.Controls.Button)controls.Children[2]).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-            Check(closed, "Windowed PDF close command failed");
+            SystemCommands.MaximizeWindow(window); Pump(80); window.UpdateLayout();
+            Check(!fullscreen && window.WindowState == WindowState.Maximized && window.WindowStyle == WindowStyle.SingleBorderWindow,
+                "Native maximize entered fullscreen or removed the title bar");
+            window.UpdateLayout();
+            Check(Math.Abs(toolbar.Margin.Left - (root.ActualWidth - toolbar.ActualWidth) / 2) < 1,
+                "Toolbar lost centering after maximize");
+            SystemCommands.RestoreWindow(window); Pump(80); window.UpdateLayout();
+            SystemCommands.CloseWindow(window); Pump(80);
+            Check(closed && window.IsVisible, "Native caption close failed to close the PDF session");
             state.End(true); window.UpdateLayout();
             Check(Math.Abs(window.Width - width) < 1 && Math.Abs(window.Height - height) < 1,
                 "Closing PDF lost the original desktop window size");
-            Check(root.Children.Count == 1 && toolbar.Margin == originalMargin, "Closing PDF retained temporary controls or toolbar placement");
+            Check(root.Children.Count == 1 && toolbar.Margin == originalMargin && window.WindowStyle == WindowStyle.None, "Closing PDF retained temporary controls or toolbar placement");
             state.Begin(); state.Show(false); window.UpdateLayout();
             Check(window.ActualWidth < width, "Default windowed mode still covered the screen");
             state.End(false);
@@ -487,3 +491,6 @@ internal static class Program
         session.TouchGesturesEnabled = true; session.IsPenMode = true;
     }
 }
+
+
+
