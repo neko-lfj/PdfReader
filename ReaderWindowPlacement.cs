@@ -19,6 +19,7 @@ namespace PdfReader
         private bool _nativeCaption;
         private Panel _controlsParent;
         private StackPanel _fallbackControls;
+        private HwndSource _workAreaSource;
         private WindowStyle _style;
         private ResizeMode _resize;
         private System.Windows.Shell.WindowChrome _chrome;
@@ -63,6 +64,7 @@ namespace PdfReader
             if (_nativeCaption || _fallbackControls != null) return;
             if (_window.AllowsTransparency)
             {
+                AttachWorkAreaLimit();
                 ShowTransparentWindowControls();
                 return;
             }
@@ -71,6 +73,36 @@ namespace PdfReader
             _window.ResizeMode = ResizeMode.CanResize;
             _window.WindowStyle = WindowStyle.SingleBorderWindow;
             _window.Closing += WindowClosing;
+        }
+        private void AttachWorkAreaLimit()
+        {
+            if (_workAreaSource != null) return;
+            _workAreaSource = HwndSource.FromHwnd(new WindowInteropHelper(_window).Handle);
+            _workAreaSource?.AddHook(WindowedWorkAreaHook);
+        }
+
+        // Borderless layered windows otherwise maximize over the taskbar. Keep
+        // this limit local to windowed PDF reading; fullscreen and the desktop
+        // overlay must recover their original monitor-sized bounds.
+        private IntPtr WindowedWorkAreaHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WmGetMinMaxInfo = 0x0024;
+            if (!_windowed || message != WmGetMinMaxInfo || lParam == IntPtr.Zero) return IntPtr.Zero;
+            var monitor = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+            if (!GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref monitor)) return IntPtr.Zero;
+            int width = monitor.Work.Right - monitor.Work.Left;
+            int height = monitor.Work.Bottom - monitor.Work.Top;
+            if (width <= 0 || height <= 0) return IntPtr.Zero;
+            var limits = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+            // Win32 expects physical pixels relative to this monitor, not WPF
+            // DIPs or absolute desktop coordinates (which may be negative).
+            limits.MaxPosition = new NativePoint {
+                X = monitor.Work.Left - monitor.Monitor.Left,
+                Y = monitor.Work.Top - monitor.Monitor.Top };
+            limits.MaxSize = new NativePoint { X = width, Y = height };
+            Marshal.StructureToPtr(limits, lParam, false);
+            handled = true;
+            return IntPtr.Zero;
         }
         // A WPF per-pixel window cannot have a native caption. Never ask the
         // user to enable a compositor that can block all other applications.
@@ -119,6 +151,8 @@ namespace PdfReader
         internal void HideWindowedControls()
         {
             _windowed = false;
+            _workAreaSource?.RemoveHook(WindowedWorkAreaHook);
+            _workAreaSource = null;
             if (_window != null) _window.LayoutUpdated -= KeepToolbarVisible;
             if (_fallbackControls != null) _controlsParent?.Children.Remove(_fallbackControls);
             _fallbackControls = null;
@@ -148,6 +182,11 @@ namespace PdfReader
             _captured = _changed = false;
         }
         [StructLayout(LayoutKind.Sequential)] private struct NativeRect { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
+        [StructLayout(LayoutKind.Sequential)] private struct MinMaxInfo
+        {
+            public NativePoint Reserved, MaxSize, MaxPosition, MinTrackSize, MaxTrackSize;
+        }
         [StructLayout(LayoutKind.Sequential)] private struct MonitorInfo { public int Size; public NativeRect Monitor, Work; public uint Flags; }
         [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
         [DllImport("user32.dll", CharSet = CharSet.Auto)] private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
