@@ -10,36 +10,42 @@ namespace PdfReader
         private readonly Action _selectMouse;
         private bool _active;
         private bool _previousFullscreen;
+        private readonly ReaderWindowPlacement _placement;
 
-        internal ReaderWindowState(Func<bool> getFullscreen, Action<bool> setFullscreen, Action selectMouse)
+        internal ReaderWindowState(Func<bool> getFullscreen, Action<bool> setFullscreen, Action selectMouse,
+            ReaderWindowPlacement placement = null)
         {
             _getFullscreen = getFullscreen;
             _setFullscreen = setFullscreen;
             _selectMouse = selectMouse;
+            _placement = placement;
         }
 
         internal void Begin()
         {
             if (_active) return;
             _previousFullscreen = _getFullscreen();
+            _placement?.Capture();
             _active = true;
         }
 
         internal void Show(bool fullscreen = true)
         {
-            if (_active) _setFullscreen(fullscreen);
+            if (!_active) return;
+            _setFullscreen(fullscreen);
+            if (!fullscreen) _placement?.ShowWindowed();
         }
 
         internal void ToggleFullscreen()
         {
-            if (_active) _setFullscreen(!_getFullscreen());
+            if (_active) Show(!_getFullscreen());
         }
 
         internal void End(bool selectMouse)
         {
             if (!_active) return;
             _active = false;
-            try { _setFullscreen(_previousFullscreen); }
+            try { _setFullscreen(_previousFullscreen); _placement?.Restore(); }
             finally { if (selectMouse) _selectMouse(); }
         }
     }

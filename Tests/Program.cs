@@ -101,6 +101,28 @@ internal static class Program
         var popup = new PdfReader.Views.ReaderPopupContent(null);
         var button = (System.Windows.Controls.Button)popup.FindName("FullscreenButton");
         Check(!button.IsEnabled && !string.IsNullOrEmpty(button.Content as string), "Fullscreen command had no label or was enabled without a document");
+        var window = new System.Windows.Window { Width = SystemParameters.PrimaryScreenWidth,
+            Height = SystemParameters.PrimaryScreenHeight, Left = 0, Top = 0,
+            WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Opacity = 0 };
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            double width = window.Width, height = window.Height;
+            bool fullscreen = false;
+            // Reproduce a host that only changes its flag and restores an
+            // already screen-sized borderless placement.
+            var state = new ReaderWindowState(() => fullscreen, value => fullscreen = value, () => { }, new ReaderWindowPlacement(window));
+            state.Begin(); state.Show(); state.ToggleFullscreen(); window.UpdateLayout();
+            Check(!fullscreen && window.ActualWidth < width && window.ActualHeight < height,
+                "Exit fullscreen changed only the flag, not the native window size");
+            state.End(false); window.UpdateLayout();
+            Check(Math.Abs(window.Width - width) < 1 && Math.Abs(window.Height - height) < 1,
+                "Closing PDF lost the original desktop window size");
+            state.Begin(); state.Show(false); window.UpdateLayout();
+            Check(window.ActualWidth < width, "Default windowed mode still covered the screen");
+            state.End(false);
+        }
+        finally { window.Close(); }
     }
 
     private static void RenderBudgetTests()

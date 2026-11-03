@@ -384,7 +384,8 @@ namespace PdfReader
             {
                 _readerWindowState ??= new ReaderWindowState(
                     () => _windowService?.IsFullscreen ?? false,
-                    value => _windowService?.SetFullscreen(value), SelectDesktopMouse);
+                    value => _windowService?.SetFullscreen(value), SelectDesktopMouse,
+                    new ReaderWindowPlacement(Application.Current.MainWindow));
                 _readerWindowState.Begin();
                 return _readerWindowState;
             });
