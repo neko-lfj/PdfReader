@@ -45,8 +45,14 @@ namespace PdfReader
         {
             if (!_active) return;
             _active = false;
-            try { _setFullscreen(_previousFullscreen); _placement?.Restore(); }
-            finally { if (selectMouse) _selectMouse(); }
+            try { _setFullscreen(_previousFullscreen); }
+            finally
+            {
+                // Selecting the desktop tool can itself restore native window
+                // placement. Restore our original geometry after that callback.
+                try { if (selectMouse) _selectMouse(); }
+                finally { _placement?.Restore(); }
+            }
         }
     }
 }

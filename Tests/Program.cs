@@ -111,11 +111,11 @@ internal static class Program
             bool fullscreen = false;
             // Reproduce a host that only changes its flag and restores an
             // already screen-sized borderless placement.
-            var state = new ReaderWindowState(() => fullscreen, value => fullscreen = value, () => { }, new ReaderWindowPlacement(window));
+            var state = new ReaderWindowState(() => fullscreen, value => fullscreen = value, () => window.Width = 100, new ReaderWindowPlacement(window));
             state.Begin(); state.Show(); state.ToggleFullscreen(); window.UpdateLayout();
             Check(!fullscreen && window.ActualWidth < width && window.ActualHeight < height,
                 "Exit fullscreen changed only the flag, not the native window size");
-            state.End(false); window.UpdateLayout();
+            state.End(true); window.UpdateLayout();
             Check(Math.Abs(window.Width - width) < 1 && Math.Abs(window.Height - height) < 1,
                 "Closing PDF lost the original desktop window size");
             state.Begin(); state.Show(false); window.UpdateLayout();
