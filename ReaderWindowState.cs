@@ -32,6 +32,7 @@ namespace PdfReader
         internal void Show(bool fullscreen = true, bool maximizeWindowed = false)
         {
             if (!_active) return;
+            _placement?.KeepReadingWindowNonTopmost();
             if (fullscreen) _placement?.HideWindowedControls();
             _setFullscreen(fullscreen);
             if (!fullscreen) _placement?.ShowWindowed(maximizeWindowed);

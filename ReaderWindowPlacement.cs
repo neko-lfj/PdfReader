@@ -15,6 +15,8 @@ namespace PdfReader
         private Rect _bounds;
         private WindowState _state;
         private bool _showInTaskbar;
+        private bool _wasTopmost;
+        private HwndSource _readingSource;
         private bool _captured, _changed;
         private readonly Action _close;
         private bool _nativeCaption;
@@ -35,12 +37,55 @@ namespace PdfReader
             if (_window == null || _captured) return;
             _state = _window.WindowState;
             _showInTaskbar = _window.ShowInTaskbar;
+            _wasTopmost = _window.Topmost;
             _style = _window.WindowStyle; _resize = _window.ResizeMode;
             _chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(_window);
             _bounds = _state == WindowState.Normal ? new Rect(_window.Left, _window.Top, _window.ActualWidth, _window.ActualHeight) : _window.RestoreBounds;
             _captured = true;
             _toolbar = _window.FindName("ViewboxFloatingBar") as FrameworkElement;
             if (_toolbar != null) _toolbarMargin = _toolbar.Margin;
+        }
+
+        internal void KeepReadingWindowNonTopmost()
+        {
+            if (!_captured || _readingSource != null) return;
+            _readingSource = HwndSource.FromHwnd(new WindowInteropHelper(_window).Handle);
+            if (_readingSource == null) return;
+            _readingSource.AddHook(ReadingZOrderHook);
+            _window.SetCurrentValue(Window.TopmostProperty, false);
+            SetWindowPos(_readingSource.Handle, HwndNotTopmost, 0, 0, 0, 0, ZOrderOnly);
+        }
+
+        private static IntPtr ReadingZOrderHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WmWindowPosChanging = 0x0046;
+            const int WmStyleChanging = 0x007C;
+            const int GwlExStyle = -20;
+            const uint WsExTopmost = 0x00000008;
+            const uint SwpNoZOrder = 0x0004;
+            if (lParam == IntPtr.Zero) return IntPtr.Zero;
+
+            // Older ICCCE hosts maintain topmost through both SetWindowPos
+            // and extended styles. Filter only those requests on the reader HWND.
+            if (message == WmWindowPosChanging)
+            {
+                var position = Marshal.PtrToStructure<WindowPosition>(lParam);
+                if (position.InsertAfter == HwndTopmost && (position.Flags & SwpNoZOrder) == 0)
+                {
+                    position.Flags |= SwpNoZOrder;
+                    Marshal.StructureToPtr(position, lParam, false);
+                }
+            }
+            else if (message == WmStyleChanging && wParam.ToInt64() == GwlExStyle)
+            {
+                var styles = Marshal.PtrToStructure<WindowStyles>(lParam);
+                if ((styles.NewStyle & WsExTopmost) != 0)
+                {
+                    styles.NewStyle &= ~WsExTopmost;
+                    Marshal.StructureToPtr(styles, lParam, false);
+                }
+            }
+            return IntPtr.Zero;
         }
         internal void ShowWindowed(bool maximize = false)
         {
@@ -182,11 +227,36 @@ namespace PdfReader
         }
         internal void Restore()
         {
-            HideWindowedControls();
-            if (_changed && !_bounds.IsEmpty && _bounds.Width > 0 && _bounds.Height > 0)
-            { Apply(_bounds); _window.WindowState = _state; }
-            _captured = _changed = false;
+            try
+            {
+                HideWindowedControls();
+                if (_changed && !_bounds.IsEmpty && _bounds.Width > 0 && _bounds.Height > 0)
+                { Apply(_bounds); _window.WindowState = _state; }
+            }
+            finally
+            {
+                var source = _readingSource;
+                _readingSource = null;
+                _captured = _changed = false;
+                if (source != null && !source.IsDisposed)
+                {
+                    source.RemoveHook(ReadingZOrderHook);
+                    _window.SetCurrentValue(Window.TopmostProperty, _wasTopmost);
+                    SetWindowPos(source.Handle, _window.Topmost ? HwndTopmost : HwndNotTopmost, 0, 0, 0, 0, ZOrderOnly);
+                }
+            }
         }
+        private static readonly IntPtr HwndTopmost = new IntPtr(-1);
+        private static readonly IntPtr HwndNotTopmost = new IntPtr(-2);
+        private const uint ZOrderOnly = 0x0001 | 0x0002 | 0x0010 | 0x0200; // No size, move, activation, or owner Z-order change.
+        [StructLayout(LayoutKind.Sequential)] private struct WindowPosition
+        {
+            public IntPtr Window, InsertAfter;
+            public int X, Y, Width, Height;
+            public uint Flags;
+        }
+        [StructLayout(LayoutKind.Sequential)] private struct WindowStyles { public uint OldStyle, NewStyle; }
+        [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
         [StructLayout(LayoutKind.Sequential)] private struct NativeRect { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
         [StructLayout(LayoutKind.Sequential)] private struct MinMaxInfo
