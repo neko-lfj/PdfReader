@@ -14,6 +14,7 @@ namespace PdfReader
         private readonly Window _window;
         private Rect _bounds;
         private WindowState _state;
+        private bool _showInTaskbar;
         private bool _captured, _changed;
         private readonly Action _close;
         private bool _nativeCaption;
@@ -33,6 +34,7 @@ namespace PdfReader
         {
             if (_window == null || _captured) return;
             _state = _window.WindowState;
+            _showInTaskbar = _window.ShowInTaskbar;
             _style = _window.WindowStyle; _resize = _window.ResizeMode;
             _chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(_window);
             _bounds = _state == WindowState.Normal ? new Rect(_window.Left, _window.Top, _window.ActualWidth, _window.ActualHeight) : _window.RestoreBounds;
@@ -40,7 +42,7 @@ namespace PdfReader
             _toolbar = _window.FindName("ViewboxFloatingBar") as FrameworkElement;
             if (_toolbar != null) _toolbarMargin = _toolbar.Margin;
         }
-        internal void ShowWindowed()
+        internal void ShowWindowed(bool maximize = false)
         {
             if (!_captured || _window == null) return;
             var handle = new WindowInteropHelper(_window).Handle;
@@ -55,8 +57,10 @@ namespace PdfReader
             Apply(new Rect(area.X + area.Width * .05, area.Y + area.Height * .05, area.Width * .9, area.Height * .9));
             _windowed = true;
             ShowControls();
+            _window.SetCurrentValue(Window.ShowInTaskbarProperty, true);
             _window.LayoutUpdated -= KeepToolbarVisible;
             _window.LayoutUpdated += KeepToolbarVisible;
+            if (maximize) _window.WindowState = WindowState.Maximized;
             KeepToolbarVisible(null, EventArgs.Empty);
         }
         private void ShowControls()
@@ -150,6 +154,7 @@ namespace PdfReader
         }
         internal void HideWindowedControls()
         {
+            bool wasWindowed = _windowed;
             _windowed = false;
             _workAreaSource?.RemoveHook(WindowedWorkAreaHook);
             _workAreaSource = null;
@@ -158,6 +163,7 @@ namespace PdfReader
             _fallbackControls = null;
             _controlsParent = null;
             RestoreCaption();
+            if (wasWindowed) _window.SetCurrentValue(Window.ShowInTaskbarProperty, _showInTaskbar);
             if (_toolbar != null) _toolbar.SetCurrentValue(FrameworkElement.MarginProperty, _toolbarMargin);
         }
         private void RestoreCaption()

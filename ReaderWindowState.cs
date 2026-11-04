@@ -29,12 +29,12 @@ namespace PdfReader
             _active = true;
         }
 
-        internal void Show(bool fullscreen = true)
+        internal void Show(bool fullscreen = true, bool maximizeWindowed = false)
         {
             if (!_active) return;
+            if (fullscreen) _placement?.HideWindowedControls();
             _setFullscreen(fullscreen);
-            if (!fullscreen) _placement?.ShowWindowed();
-            else _placement?.HideWindowedControls();
+            if (!fullscreen) _placement?.ShowWindowed(maximizeWindowed);
         }
 
         internal void ToggleFullscreen()
@@ -46,7 +46,11 @@ namespace PdfReader
         {
             if (!_active) return;
             _active = false;
-            try { _setFullscreen(_previousFullscreen); }
+            try
+            {
+                _placement?.HideWindowedControls();
+                _setFullscreen(_previousFullscreen);
+            }
             finally
             {
                 // Selecting the desktop tool can itself restore native window

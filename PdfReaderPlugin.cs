@@ -409,7 +409,7 @@ namespace PdfReader
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     if (ReferenceEquals(_readerWindowState, windowState) && session.IsOpen)
-                        windowState.Show(_config.DefaultFullscreen);
+                        windowState.Show(_config.DefaultFullscreen, maximizeWindowed: true);
                 });
 
                 // 打开 PDF 后自动开启双指缩放/移动：把当前的笔模式同步给会话（单指平移门控用）。

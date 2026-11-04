@@ -80,9 +80,9 @@ internal static class Program
         string settings = Path.Combine(Path.GetTempPath(), "PdfFullscreen-" + Guid.NewGuid() + ".json");
         try
         {
-            var config = new ReaderConfig(); Check(config.DefaultFullscreen, "Existing configs lost default fullscreen");
-            config.DefaultFullscreen = false; config.Save(settings);
-            Check(!ReaderConfig.Load(settings).DefaultFullscreen, "Fullscreen preference did not survive a restart");
+            var config = new ReaderConfig(); Check(!config.DefaultFullscreen, "New configs should open in windowed mode");
+            config.DefaultFullscreen = true; config.Save(settings);
+            Check(ReaderConfig.Load(settings).DefaultFullscreen, "Fullscreen preference did not survive a restart");
         }
         finally { File.Delete(settings); }
     }
@@ -93,11 +93,11 @@ internal static class Program
     {
         var settingsView = new PdfReader.Views.SettingsView(null);
         var toggle = (iNKORE.UI.WPF.Modern.Controls.ToggleSwitch)settingsView.FindName("FullscreenToggle");
-        Check(toggle.IsOn, "Settings did not initialize fullscreen default");
-        toggle.IsOn = false;
+        Check(!toggle.IsOn, "Settings did not initialize windowed default");
+        toggle.IsOn = true;
         var settingsConfig = (ReaderConfig)typeof(PdfReader.Views.SettingsView).GetField("_config",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(settingsView);
-        Check(!settingsConfig.DefaultFullscreen, "Settings toggle did not update the configuration");
+        Check(settingsConfig.DefaultFullscreen, "Settings toggle did not update the configuration");
         var popup = new PdfReader.Views.ReaderPopupContent(null);
         var button = (System.Windows.Controls.Button)popup.FindName("FullscreenButton");
         Check(!button.IsEnabled && !string.IsNullOrEmpty(button.Content as string), "Fullscreen command had no label or was enabled without a document");
